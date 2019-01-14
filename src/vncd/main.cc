@@ -4,14 +4,18 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <unistdx/net/socket_address>
+#include <unistdx/util/group>
+#include <unistdx/util/user>
 
 class VNCd {
 
 private:
 	std::string _group;
 	sys::port_type _port = 50000;
+	std::vector<sys::port_type> _ports;
 
 public:
 
@@ -41,9 +45,6 @@ public:
 
 	void
 	validate_arguments() {
-		if (this->_port <= 0 || this->_port > 65535) {
-			throw std::invalid_argument("bad port");
-		}
 		if (this->_group.empty()) {
 			throw std::invalid_argument("bad group");
 		}
@@ -51,13 +52,29 @@ public:
 
 	void
 	usage() {
-		std::cout << "usage: vncd [-h] [-g GROUP]\n";
+		std::cout << "usage: vncd [-h] [-p PORT] -g GROUP\n";
 	}
 
 	void
 	run() {
 		std::clog << "_group=" << _group << std::endl;
 		std::clog << "_port=" << _port << std::endl;
+		sys::group group;
+		if (!sys::find_group(_group.data(), group)) {
+			throw std::invalid_argument("unknown group");
+		}
+		for (const auto& member : group) {
+			sys::user user;
+			if (!sys::find_user(member, user)) {
+				throw std::invalid_argument("unknown user in group");
+			}
+			long new_port = this->_port + user.id();
+			if (new_port <= 0 || new_port > 65535) {
+				throw std::invalid_argument("bad port");
+			}
+			this->_ports.push_back(static_cast<sys::port_type>(new_port));
+			std::clog << "_ports.back()=" << _ports.back() << std::endl;
+		}
 	}
 
 };

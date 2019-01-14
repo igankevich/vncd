@@ -10,12 +10,14 @@
 #include <unistdx/util/group>
 #include <unistdx/util/user>
 
+#include <vncd/server.hh>
+
 class VNCd {
 
 private:
 	std::string _group;
 	sys::port_type _port = 50000;
-	std::vector<sys::port_type> _ports;
+	sys::socket_address _address;
 
 public:
 
@@ -41,6 +43,19 @@ public:
 				std::exit(EXIT_FAILURE);
 			}
 		}
+		std::clog << "::optind=" << ::optind << std::endl;
+		std::clog << "argc=" << argc << std::endl;
+		if (::optind+1 < argc) {
+			throw std::invalid_argument("trailing arguments");
+		}
+		if (::optind+1 == argc) {
+			std::stringstream tmp;
+			tmp << argv[::optind] << ":0";
+			tmp >> this->_address;
+			if (!tmp) {
+				throw std::invalid_argument("bad address");
+			}
+		}
 	}
 
 	void
@@ -52,29 +67,38 @@ public:
 
 	void
 	usage() {
-		std::cout << "usage: vncd [-h] [-p PORT] -g GROUP\n";
+		std::cout << "usage: vncd [-h] [-p PORT] -g GROUP [ADDRESS]\n";
 	}
 
 	void
 	run() {
+		using namespace vncd;
 		std::clog << "_group=" << _group << std::endl;
 		std::clog << "_port=" << _port << std::endl;
+		std::clog << "_address=" << _address << std::endl;
 		sys::group group;
 		if (!sys::find_group(_group.data(), group)) {
 			throw std::invalid_argument("unknown group");
 		}
+		Server server(this->_port);
 		for (const auto& member : group) {
 			sys::user user;
 			if (!sys::find_user(member, user)) {
 				throw std::invalid_argument("unknown user in group");
 			}
+			if (user.id() < 1000) {
+				throw std::invalid_argument("will not work for unpriviledged user");
+			}
 			long new_port = this->_port + user.id();
 			if (new_port <= 0 || new_port > 65535) {
 				throw std::invalid_argument("bad port");
 			}
-			this->_ports.push_back(static_cast<sys::port_type>(new_port));
-			std::clog << "_ports.back()=" << _ports.back() << std::endl;
+			sys::port_type port = static_cast<sys::port_type>(new_port);
+			sys::socket_address address{this->_address, port};
+			std::clog << "address=" << address << std::endl;
+			server.add(new Local_server(address));
 		}
+		server.run();
 	}
 
 };

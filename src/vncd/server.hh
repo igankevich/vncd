@@ -5,7 +5,12 @@
 #include <memory>
 #include <unordered_map>
 
+#include <unistdx/base/log_message>
+#include <unistdx/io/fildesbuf>
 #include <unistdx/io/poller>
+#include <unistdx/ipc/execute>
+#include <unistdx/ipc/identity>
+#include <unistdx/ipc/process_group>
 #include <unistdx/net/socket>
 #include <unistdx/net/socket_address>
 
@@ -67,16 +72,22 @@ namespace vncd {
 		sys::event_poller _poller;
 		std::unordered_map<sys::fd_type,connection_pointer> _connections;
 		sys::port_type _port;
+		sys::port_type _vnc_base_port;
 
 	public:
 
 		inline explicit
-		Server(sys::port_type port):
-		_port(port) {}
+		Server(sys::port_type port, sys::port_type vnc_port):
+		_port(port), _vnc_base_port(vnc_port) {}
 
 		inline sys::port_type
 		port() const noexcept {
 			return this->_port;
+		}
+
+		inline sys::port_type
+		vnc_base_port() const noexcept {
+			return this->_vnc_base_port;
 		}
 
 		inline void
@@ -92,13 +103,13 @@ namespace vncd {
 			this->_poller.wait(
 				lock,
 				[this] () {
-					for (const auto& event : this->_poller) {
-						auto result = this->_connections.find(event.fd());
-						if (result == this->_connections.end()) {
-							std::clog << "bad fd: " << event.fd() << std::endl;
-							continue;
+				    for (const auto& event : this->_poller) {
+				        auto result = this->_connections.find(event.fd());
+				        if (result == this->_connections.end()) {
+				            std::clog << "bad fd: " << event.fd() << std::endl;
+				            continue;
 						}
-						result->second->process(event);
+				        result->second->process(event);
 					}
 				    return false;
 				}
@@ -110,10 +121,22 @@ namespace vncd {
 	/// VNC remote client that connects to one of the local servers.
 	class Remote_client: public Connection {
 
+	public:
+		typedef sys::basic_fildesbuf<char,std::char_traits<char>,sys::fd_type>
+		    streambuf_type;
+
+		enum class State {
+			Initial,
+			Starting_VNC_server
+		};
+
 	private:
 		sys::socket_address _address;
 		sys::uid_type _uid;
 		sys::gid_type _gid;
+		streambuf_type _buffer;
+		State _state = State::Initial;
+		sys::process_group _vnc;
 
 	public:
 
@@ -121,10 +144,58 @@ namespace vncd {
 		Remote_client(sys::socket& server_socket, sys::uid_type uid):
 		_uid(uid), _gid(uid) {
 			server_socket.accept(this->_socket, this->_address);
+			this->_buffer.setfd(this->fd());
 		}
 
 		void
 		process(const sys::epoll_event& event) override {
+			if (event.in()) {
+				this->_buffer.pubfill();
+			}
+			switch (this->_state) {
+			case State::Initial:
+				this->_state = State::Starting_VNC_server;
+				this->vnc_start();
+				break;
+			case State::Starting_VNC_server:
+				// TODO add local vnc client to server
+				break;
+			}
+		}
+
+	private:
+
+		void
+		vnc_start() {
+			try {
+				this->_vnc.emplace([this] () {this->vnc_main();});
+			} catch (const std::exception& err) {
+				sys::log_message(
+					"failed to start VNC server for _: _",
+					this->_uid,
+					err.what()
+				);
+			}
+		}
+
+		void
+		vnc_main() {
+			sys::this_process::set_identity(this->_uid, this->_gid);
+			const char* script = std::getenv("VNCD_SERVER");
+			if (!script) {
+				throw std::invalid_argument("VNCD_SERVER variable is not set");
+			}
+			sys::argstream args;
+			args.append(script);
+			::setenv("VNCD_UID", std::to_string(this->_uid).data(), 1);
+			::setenv("VNCD_GID", std::to_string(this->_gid).data(), 1);
+			::setenv("VNCD_PORT", std::to_string(this->vnc_port()).data(), 1);
+			sys::this_process::execute(args);
+		}
+
+		inline sys::port_type
+		vnc_port() const {
+			return this->_parent->vnc_base_port() + this->_uid;
 		}
 
 	};

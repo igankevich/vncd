@@ -6,6 +6,6 @@ project(
 	default_options: ['cpp_std=c++11']
 )
 
-unistdx = dependency('unistdx', version: '>=0.4.14')
+unistdx = dependency('unistdx', version: '>=0.4.15')
 
 subdir('src')

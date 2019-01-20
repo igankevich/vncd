@@ -6,18 +6,22 @@
 #include <memory>
 #include <queue>
 #include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
 
 #include <unistdx/base/log_message>
 #include <unistdx/base/simple_lock>
 #include <unistdx/base/spin_mutex>
-#include <unistdx/io/fildesbuf>
 #include <unistdx/io/poller>
 #include <unistdx/ipc/execute>
 #include <unistdx/ipc/identity>
 #include <unistdx/ipc/process_group>
 #include <unistdx/net/socket>
 #include <unistdx/net/socket_address>
+
+#include <vncd/task.hh>
+#include <vncd/user.hh>
 
 namespace vncd {
 
@@ -26,6 +30,21 @@ namespace vncd {
 	class Local_server;
 	class Remote_client;
 	class Server;
+
+	struct No_lock {
+		No_lock() {}
+		template <class T> No_lock(T&) {}
+		void lock() {}
+		void unlock() {}
+	};
+
+	template <class T>
+	inline void
+	environment(const char* key, T value) {
+		std::stringstream str;
+		str << value;
+		UNISTDX_CHECK(::setenv(key, str.str().data(), 1));
+	}
 
 	class Connection {
 
@@ -139,116 +158,19 @@ namespace vncd {
 			this->_state = State::Stopping;
 		}
 
-	};
-
-	class Task {
-
-	public:
-		typedef std::chrono::system_clock clock_type;
-		typedef clock_type::time_point time_point;
-		typedef clock_type::duration duration;
-
-	private:
-		Server* _parent = nullptr;
-		time_point _at{duration::zero()};
-		duration _period{duration::zero()};
-		int _nattempts = 1;
-
-	public:
-
-		Task() = default;
-
-		virtual
-		~Task() = default;
-
-		Task(const Task&) = default;
-
-		Task(Task&&) = default;
-
-		Task&
-		operator=(Task&&) = default;
-
-		Task&
-		operator=(const Task&) = default;
-
-		virtual void
-		run() {
-			if (this->_nattempts > 0) {
-				--this->_nattempts;
-			}
-		}
-
-		inline void
-		at(time_point rhs) {
-			this->_at = rhs;
-		}
-
-		inline time_point
-		at() const {
-			return this->_at;
-		}
-
-		inline duration
-		period() const {
-			return this->_period;
-		}
-
-		inline void
-		period(duration d) {
-			this->_period = d;
-		}
-
-		inline bool
-		has_period() const {
-			return this->_period != duration::zero();
-		}
-
-		inline void
-		repeat(int n) {
-			this->_nattempts = n;
-		}
-
-		inline int
-		remaining_attempts() const {
-			return this->_nattempts;
-		}
-
-		inline void
-		parent(Server* rhs) {
-			this->_parent = rhs;
-		}
-
-		inline Server&
-		parent() {
-			return *this->_parent;
-		}
-
-		inline const Server&
-		parent() const {
-			return *this->_parent;
+		inline sys::port_type
+		port() const {
+			return this->_socket.bind_addr().port();
 		}
 
 	};
-
-	inline bool
-	operator<(const Task& a, const Task& b) {
-		return a.at() < b.at();
-	}
-
-	inline bool
-	operator<(const std::unique_ptr<Task>& a, const std::unique_ptr<Task>& b) {
-		return operator<(*a, *b);
-	}
 
 	class Server {
 
 	private:
-		friend class Local_server;
-
-	private:
 		typedef std::unique_ptr<Connection> connection_pointer;
 		typedef sys::spin_mutex mutex_type;
-		typedef sys::simple_lock<mutex_type> lock_type;
+		typedef No_lock lock_type;
 		typedef std::unique_ptr<Task> task_pointer;
 		typedef Task::clock_type clock_type;
 		typedef Task::time_point time_point;
@@ -257,41 +179,49 @@ namespace vncd {
 	private:
 		sys::event_poller _poller;
 		std::unordered_map<sys::fd_type,connection_pointer> _connections;
-		sys::port_type _port;
-		sys::port_type _vnc_base_port;
 		mutex_type _mutex;
 		std::priority_queue<task_pointer> _tasks;
 
 	public:
 
-		inline explicit
-		Server(sys::port_type port, sys::port_type vnc_port):
-		_port(port), _vnc_base_port(vnc_port) {}
-
-		inline sys::port_type
-		port() const noexcept {
-			return this->_port;
-		}
-
-		inline sys::port_type
-		vnc_base_port() const noexcept {
-			return this->_vnc_base_port;
-		}
-
 		inline void
-		add(Connection* connection) {
+		add(Connection* connection, sys::event events=sys::event::in) {
 			if (!connection) {
 				throw std::invalid_argument("bad connection");
 			}
 			connection->parent(this);
 			auto fd = connection->fd();
+			lock_type lock(this->_mutex);
 			this->_connections.emplace(fd, connection);
-			this->_poller.emplace(fd, sys::event::in);
+			this->_poller.emplace(fd, events);
 			connection->start();
 		}
 
 		inline void
-		add(Task* task) {
+		remove(sys::port_type port) {
+			lock_type lock(this->_mutex);
+			auto first = this->_connections.begin();
+			auto last = this->_connections.end();
+			while (first != last) {
+				auto& connection = *first->second;
+				if (connection.port() == port) {
+					first = this->_connections.erase(first);
+					last = this->_connections.end();
+				} else {
+					++first;
+				}
+			}
+		}
+
+		template <class T>
+		inline void
+		submit(std::unique_ptr<T>&& task) {
+			static_assert(std::is_base_of<Task,T>::value, "bad type");
+			this->submit(task.release());
+		}
+
+		inline void
+		submit(Task* task) {
 			if (!task) {
 				throw std::invalid_argument("bad task");
 			}
@@ -309,6 +239,8 @@ namespace vncd {
 				if (!this->_tasks.empty()) {
 					auto dt = this->_tasks.top()->at() - clock_type::now();
 					timeout = std::max(dt, duration::zero());
+					using namespace std::chrono;
+					auto s = duration_cast<seconds>(dt);
 				}
 				std::cv_status status = this->_poller.wait_for(lock, timeout);
 				if (status == std::cv_status::timeout) {
@@ -323,14 +255,22 @@ namespace vncd {
 
 		void
 		process_events() {
+			auto pipe_fd = this->_poller.pipe_in();
 			for (const auto& event : this->_poller) {
+				if (event.fd() == pipe_fd) {
+					continue;
+				}
 				auto result = this->_connections.find(event.fd());
 				if (result == this->_connections.end()) {
-					std::clog << "bad fd: " << event.fd() << std::endl;
+					this->log("bad fd _", event.fd());
 					continue;
 				}
 				auto& connection = *result->second;
-				connection.process(event);
+				try {
+					connection.process(event);
+				} catch (const std::exception& err) {
+					this->log("session error: _", err.what());
+				}
 				if (connection.stopped()) {
 					this->_connections.erase(result);
 				}
@@ -340,16 +280,26 @@ namespace vncd {
 		void
 		process_tasks() {
 			auto now = clock_type::now();
-			while (this->_tasks.top()->at() <= now) {
+			while (!this->_tasks.empty() && this->_tasks.top()->at() <= now) {
 				task_pointer& tmp = const_cast<task_pointer&>(this->_tasks.top());
 				task_pointer task = std::move(tmp);
 				this->_tasks.pop();
-				task->run();
+				try {
+					task->run();
+				} catch (const std::exception& err) {
+					this->log("task error: _", err.what());
+				}
 				if (task->remaining_attempts() != 0 && task->has_period()) {
 					task->at(now + task->period());
 					this->_tasks.emplace(std::move(task));
 				}
 			}
+		}
+
+		template <class ... Args>
+		inline void
+		log(const char* message, const Args& ... args) const {
+			sys::log_message("server", message, args...);
 		}
 
 	};
@@ -358,14 +308,29 @@ namespace vncd {
 	class Session {
 
 	private:
-		sys::uid_type _uid;
-		sys::gid_type _gid;
+		User _user;
 		sys::socket _remote_socket;
 		sys::socket _local_socket;
 		sys::process_group _processes;
 		sys::port_type _port;
+		sys::port_type _vnc_port;
+		sys::pipe _in;
+		sys::pipe _out;
+		size_t _buffer_size = 65536;
+		sys::splice _splice;
 
 	public:
+
+		inline explicit
+		Session(const User& user):
+		_user(user) {
+			this->_buffer_size = this->_in.in().pipe_buffer_size();
+		}
+
+		inline void
+		set_vnc_port(sys::port_type p) {
+			this->_vnc_port = p;
+		}
 
 		inline void
 		set_port(sys::port_type p) {
@@ -377,10 +342,17 @@ namespace vncd {
 			return this->_port;
 		}
 
+		inline sys::port_type
+		vnc_port() const {
+			return this->_vnc_port;
+		}
+
 		inline void
-		set_identity(sys::uid_type uid, sys::gid_type gid) {
-			this->_uid = uid;
-			this->_gid = gid;
+		set_identity() {
+			sys::this_process::set_identity(
+				this->_user.id(),
+				this->_user.group_id()
+			);
 		}
 
 		inline void
@@ -398,26 +370,23 @@ namespace vncd {
 			try {
 				this->_processes.emplace([this] () {this->vnc_main();});
 			} catch (const std::exception& err) {
-				sys::log_message(
-					"failed to start VNC server for _: _",
-					this->_uid,
-					err.what()
-				);
+				this->log("failed to start VNC server: _", err.what());
 			}
 		}
 
 		void
 		vnc_main() {
-			sys::this_process::set_identity(this->_uid, this->_gid);
+			this->set_identity();
 			const char* script = std::getenv("VNCD_SERVER");
 			if (!script) {
 				throw std::invalid_argument("VNCD_SERVER variable is not set");
 			}
 			sys::argstream args;
 			args.append(script);
-			::setenv("VNCD_UID", std::to_string(this->_uid).data(), 1);
-			::setenv("VNCD_GID", std::to_string(this->_gid).data(), 1);
-			::setenv("VNCD_PORT", std::to_string(this->_port).data(), 1);
+			this->log("executing _", args);
+			environment("VNCD_UID", this->_user.id());
+			environment("VNCD_GID", this->_user.group_id());
+			environment("VNCD_PORT", vnc_port());
 			sys::this_process::execute(args);
 		}
 
@@ -426,27 +395,91 @@ namespace vncd {
 			try {
 				this->_processes.emplace([this] () {this->x_session_main();});
 			} catch (const std::exception& err) {
-				sys::log_message(
-					"failed to start X session for _: _",
-					this->_uid,
-					err.what()
-				);
+				this->log("failed to start X session: _", err.what());
 			}
 		}
 
 		void
 		x_session_main() {
-			sys::this_process::set_identity(this->_uid, this->_gid);
+			this->set_identity();
 			const char* script = std::getenv("VNCD_SESSION");
 			if (!script) {
 				throw std::invalid_argument("VNCD_SESSION variable is not set");
 			}
 			sys::argstream args;
 			args.append(script);
+			this->log("executing _", args);
+			environment("DISPLAY", ':' + std::to_string(this->_user.id()));
 			sys::this_process::execute(args);
 		}
 
+		void
+		copy_remote_to_local() {
+			ssize_t n1 = 0, n2 = 0;
+			if (this->_remote_socket) {
+				n1 = this->_splice(this->_remote_socket, this->_in, this->_buffer_size);
+			}
+			if (this->_local_socket) {
+				n2 = this->_splice(this->_in, this->_local_socket, this->_buffer_size);
+			}
+			this->log("_ _ _", __func__, n1, n2);
+		}
+
+		void
+		copy_local_to_remote() {
+			ssize_t n1 = 0, n2 = 0;
+			if (this->_local_socket) {
+				n1 = this->_splice(this->_local_socket, this->_out, this->_buffer_size);
+			}
+			if (this->_remote_socket) {
+				n2 = this->_splice(this->_out, this->_remote_socket, this->_buffer_size);
+			}
+			this->log("_ _ _", __func__, n1, n2);
+		}
+
+		void
+		flush() {
+			copy_remote_to_local();
+		}
+
+		void
+		terminate() {
+			this->log("terminate");
+			try {
+				this->_processes.terminate();
+			} catch (const sys::bad_call& err) {
+				if (err.errc() != std::errc::no_such_process) {
+					throw;
+				}
+			}
+			try {
+				No_lock lock;
+				this->_processes.wait(
+					lock,
+					[this](const sys::process&, const sys::process_status& status) {
+						this->log("process exited with status _", status);
+					}
+				);
+			} catch (const sys::bad_call& err) {
+				if (err.errc() != std::errc::no_child_process) {
+					throw;
+				}
+			}
+			this->_in.close();
+			this->_out.close();
+			this->_local_socket.close();
+			this->_remote_socket.close();
+		}
+
+		template <class ... Args>
+		inline void
+		log(const char* message, const Args& ... args) const {
+			sys::log_message(this->_user.name().data(), message, args...);
+		}
+
 	};
+
+	typedef std::shared_ptr<Session> session_pointer;
 
 	/// Local VNC client that connects to the local VNC server.
 	class Local_client: public Connection {
@@ -459,23 +492,26 @@ namespace vncd {
 		inline explicit
 		Local_client(std::shared_ptr<Session> session):
 		_session(session) {
-			this->_socket.connect({{127,0,0,1},this->_session->port()});
+			sys::socket_address address{{127,0,0,1},this->_session->vnc_port()};
+			session->log("connecting to _", address);
+			this->_socket.bind({{127,0,0,1},0});
+			this->_socket.connect(address);
 		}
 
 		void
 		process(const sys::epoll_event& event) override {
 			if (starting() && !event.bad()) {
 				this->_session->set_local_socket(this->_socket);
+				this->_session->flush();
 				this->_session->x_session_start();
 				this->state(State::Started);
 			}
 			if (started() && event.bad()) {
-				this->stop();
+				this->_session->terminate();
+				this->state(State::Stopping);
 			}
-			if (started()) {
-				if (event.in()) {
-					// TODO splice
-				}
+			if (started() && event.in()) {
+				this->_session->copy_local_to_remote();
 			}
 		}
 
@@ -492,12 +528,14 @@ namespace vncd {
 		Local_client_task(std::shared_ptr<Session> session):
 		_session(session) {
 			this->period(std::chrono::seconds(1));
-			this->repeat(7);
+			this->repeat(1);
+			this->at(clock_type::now() + this->period());
 		}
 
 		void run() override {
 			Task::run();
-			this->parent().add(new Local_client(this->_session));
+			this->_session->log("attempts left _", remaining_attempts());
+			this->parent().add(new Local_client(this->_session), sys::event::inout);
 		}
 
 	};
@@ -508,33 +546,37 @@ namespace vncd {
 	private:
 		sys::socket_address _address;
 		sys::process_group _vnc;
-		std::shared_ptr<Session> _session{std::make_shared<Session>()};
+		std::shared_ptr<Session> _session;
 
 	public:
 
 		inline explicit
-		Remote_client(sys::socket& server_socket, sys::uid_type uid) {
-			this->_session->set_identity(uid, uid);
-			this->_session->set_port(this->parent().vnc_base_port());
+		Remote_client(sys::socket& server_socket, session_pointer&& session):
+		_session(std::move(session)) {
 			server_socket.accept(this->_socket, this->_address);
 		}
 
 		void
 		process(const sys::epoll_event& event) override {
 			if (starting() && !event.bad()) {
+				session()->log("accept");
 				this->_session->set_remote_socket(this->_socket);
 				this->_session->vnc_start();
-				this->parent().add(new Local_client_task(this->_session));
+				this->parent().submit(new Local_client_task(this->_session));
 				this->state(State::Started);
 			}
 			if (started() && event.bad()) {
-				this->stop();
+				this->_session->terminate();
+				this->state(State::Stopping);
 			}
-			if (started()) {
-				if (event.in()) {
-					// TODO splice
-				}
+			if (started() && event.in()) {
+				this->_session->copy_remote_to_local();
 			}
+		}
+
+		inline const session_pointer&
+		session() const {
+			return this->_session;
 		}
 
 	};
@@ -544,15 +586,25 @@ namespace vncd {
 
 	private:
 		sys::socket_address _address;
+		sys::port_type _vnc_port;
+		User _user;
 
 	public:
 
 		inline explicit
-		Local_server(const sys::socket_address& address):
-		Connection(address.family()), _address(address) {
+		Local_server(
+			const sys::socket_address& address,
+			sys::port_type vnc_port,
+			const User& user
+		):
+		Connection(address.family()),
+		_address(address),
+		_vnc_port(vnc_port),
+		_user(user) {
 			this->_socket.setopt(sys::socket::reuse_addr);
 			this->_socket.bind(this->_address);
 			this->_socket.listen();
+			sys::log_message(this->_user.name().data(), "listen");
 		}
 
 		inline sys::fd_type
@@ -565,13 +617,22 @@ namespace vncd {
 			return this->_address.port();
 		}
 
+		inline sys::port_type
+		vnc_port() const noexcept {
+			return this->_vnc_port;
+		}
+
 		void
 		process(const sys::epoll_event& event) override {
 			Connection::process(event);
 			if (started() && event.in()) {
-				sys::uid_type uid = this->parent().port() + this->port();
-				std::clog << "user " << uid << " connected" << std::endl;
-				this->parent().add(new Remote_client(this->_socket, uid));
+				auto session = std::make_shared<Session>(this->_user);
+				session->set_port(port());
+				session->set_vnc_port(vnc_port());
+				this->parent().add(new Remote_client(
+					this->_socket,
+					std::move(session)
+				));
 			}
 		}
 

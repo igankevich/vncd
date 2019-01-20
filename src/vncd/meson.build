@@ -12,3 +12,5 @@ executable(
 	dependencies: vncd_deps,
 	include_directories: src
 )
+
+subdir('test')

@@ -9,3 +9,4 @@ project(
 unistdx = dependency('unistdx', version: '>=0.4.15')
 
 subdir('src')
+subdir('rpm')

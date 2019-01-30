@@ -197,8 +197,9 @@ main(int argc, char* argv[]) {
 	using namespace vncd;
 	int ret = EXIT_SUCCESS;
 	try {
-		sys::this_process::ignore_signal(sys::signal::child);
-		sys::this_process::ignore_signal(sys::signal::broken_pipe);
+//		sys::this_process::ignore_signal(sys::signal::child);
+//		sys::this_process::ignore_signal(sys::signal::broken_pipe);
+//		sys::this_process::ignore_signal(sys::signal::terminal_window_resize);
 		Server server;
 		std::unique_ptr<Update_users> update_users(new Update_users(server));
 		update_users->parse_arguments(argc, argv);

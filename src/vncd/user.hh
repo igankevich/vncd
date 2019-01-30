@@ -14,6 +14,8 @@ namespace vncd {
 		sys::uid_type _uid;
 		sys::gid_type _gid;
 		std::string _name;
+		std::string _home;
+		std::string _shell;
 
 	public:
 
@@ -28,7 +30,10 @@ namespace vncd {
 		User(const sys::user& user):
 		_uid(user.id()),
 		_gid(user.group_id()),
-		_name(user.name()) {}
+		_name(user.name()),
+		_home(user.home()),
+		_shell(user.shell())
+		{}
 
 		inline sys::uid_type
 		id() const {
@@ -43,6 +48,16 @@ namespace vncd {
 		inline const std::string&
 		name() const {
 			return this->_name;
+		}
+
+		inline const std::string&
+		home() const {
+			return this->_home;
+		}
+
+		inline const std::string&
+		shell() const {
+			return this->_shell;
 		}
 
 		inline bool

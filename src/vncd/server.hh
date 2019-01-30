@@ -40,10 +40,17 @@ namespace vncd {
 
 	template <class T>
 	inline void
-	environment(const char* key, T value) {
+	environment(const char* key, const T& value) {
 		std::stringstream str;
 		str << value;
 		UNISTDX_CHECK(::setenv(key, str.str().data(), 1));
+	}
+
+	inline void
+	environment(const char* key, const std::string& value) {
+		std::stringstream str;
+		str << value;
+		UNISTDX_CHECK(::setenv(key, value.data(), 1));
 	}
 
 	class Connection {
@@ -259,7 +266,18 @@ namespace vncd {
 					using namespace std::chrono;
 					auto s = duration_cast<seconds>(dt);
 				}
-				std::cv_status status = this->_poller.wait_for(lock, timeout);
+				std::cv_status status;
+				bool success = false;
+				while (!success) {
+					try {
+						status = this->_poller.wait_for(lock, timeout);
+						success = true;
+					} catch (const sys::bad_call& err) {
+						if (err.errc() != std::errc::interrupted) {
+							throw;
+						}
+					}
+				}
 				if (status == std::cv_status::timeout) {
 					this->process_tasks();
 				} else {
@@ -405,6 +423,9 @@ namespace vncd {
 			environment("VNCD_UID", this->_user.id());
 			environment("VNCD_GID", this->_user.group_id());
 			environment("VNCD_PORT", vnc_port());
+			environment("HOME", this->_user.home());
+			environment("SHELL", this->_user.shell());
+			environment("USER", this->_user.name());
 			sys::this_process::execute(args);
 		}
 
@@ -427,6 +448,9 @@ namespace vncd {
 			sys::argstream args;
 			args.append(script);
 			this->log("executing _", args);
+			environment("HOME", this->_user.home());
+			environment("SHELL", this->_user.shell());
+			environment("USER", this->_user.name());
 			environment("DISPLAY", ':' + std::to_string(this->_user.id()));
 			sys::this_process::execute(args);
 		}
@@ -578,18 +602,18 @@ namespace vncd {
 	public:
 
 		inline explicit
-		Remote_client(sys::socket& server_socket, session_pointer&& session):
+		Remote_client(sys::socket& server_socket, session_pointer session):
 		_session(std::move(session)) {
+			_session->log("accepting");
 			server_socket.accept(this->_socket, this->_address);
+			this->_session->set_remote_socket(this->_socket);
+			this->_session->vnc_start();
 		}
 
 		void
 		process(const sys::epoll_event& event) override {
 			if (starting() && !event.bad()) {
-				session()->log("accept");
-				this->_session->set_remote_socket(this->_socket);
-				this->_session->vnc_start();
-				this->parent().submit(new Local_client_task(this->_session));
+				this->session()->log("accept");
 				this->state(State::Started);
 			}
 			if (started() && event.bad()) {
@@ -656,10 +680,8 @@ namespace vncd {
 				auto session = std::make_shared<Session>(this->_user);
 				session->set_port(port());
 				session->set_vnc_port(vnc_port());
-				this->parent().add(new Remote_client(
-					this->_socket,
-					std::move(session)
-				));
+				this->parent().add(new Remote_client(this->_socket, session));
+				this->parent().submit(new Local_client_task(session));
 			}
 		}
 

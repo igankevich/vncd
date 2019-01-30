@@ -31,6 +31,15 @@ namespace vncd {
 		return result;
 	}
 
+	inline void
+	operator>>(const char* arg, std::chrono::seconds& t) {
+		long tmp;
+		if (!(std::stringstream(arg) >> tmp) || tmp <= 0) {
+			throw std::invalid_argument("bad duration");
+		}
+		t = std::chrono::seconds(tmp);
+	}
+
 	class Update_users: public Task {
 
 	public:
@@ -43,18 +52,20 @@ namespace vncd {
 		Port _vnc_base_port = 40000;
 		sys::socket_address _address;
 		set_type _old_users;
+		std::chrono::seconds _tcp_user_timeout{60};
+		std::chrono::seconds _update_period{30};
 
 	public:
 
 		inline explicit
 		Update_users(Server& server): _server(server) {
-			this->period(std::chrono::seconds(30));
+			this->period(this->_update_period);
 			this->repeat_forever();
 		}
 
 		void
 		parse_arguments(int argc, char* argv[]) {
-			for (int opt; (opt = ::getopt(argc, argv, "hg:p:P:")) != -1;) {
+			for (int opt; (opt = ::getopt(argc, argv, "hg:p:P:t:T:")) != -1;) {
 				switch (opt) {
 				case 'h':
 					usage();
@@ -67,6 +78,12 @@ namespace vncd {
 					break;
 				case 'P':
 					::optarg >> this->_vnc_base_port;
+					break;
+				case 't':
+					::optarg >> this->_tcp_user_timeout;
+					break;
+				case 'T':
+					::optarg >> this->_update_period;
 					break;
 				default:
 					usage();
@@ -93,14 +110,18 @@ namespace vncd {
 			if (!std::getenv("VNCD_SESSION")) {
 				throw std::invalid_argument("VNCD_SESSION variable is not set");
 			}
+			this->_server.set_user_timeout(this->_tcp_user_timeout);
 		}
 
 		void
 		usage() {
 			std::cout <<
-				"usage: vncd [-h] [-p PORT] [-P PORT] -g GROUP [ADDRESS]\n"
+				"usage: vncd [-h] [-p PORT] [-P PORT] [-t TIMEOUT] [-T PERIOD]"
+				" -g GROUP [ADDRESS]\n"
 				"    -p  input port\n"
-				"    -P  output port\n";
+				"    -P  output port\n"
+				"    -t  TCP user timeout\n"
+				"    -T  update period\n";
 		}
 
 		void

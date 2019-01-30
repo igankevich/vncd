@@ -8,6 +8,8 @@
 
 #include <vncd/port.hh>
 
+#include <thread>
+
 namespace vncd {
 
 	struct No_lock {
@@ -41,6 +43,9 @@ namespace vncd {
 
 		void
 		run() {
+			using namespace std::chrono;
+			using namespace std::this_thread;
+			sleep_for(seconds(10));
 			No_lock lock;
 			sys::log_message("stub", "wait");
 			this->_poller.wait(lock, [this] () { return process_events(); });

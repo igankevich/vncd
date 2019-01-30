@@ -49,6 +49,11 @@ namespace vncd {
 	class Connection {
 
 	public:
+		typedef Task::clock_type clock_type;
+		typedef Task::time_point time_point;
+		typedef Task::duration duration;
+
+	public:
 		enum class State {
 			Initial,
 			Starting,
@@ -85,6 +90,11 @@ namespace vncd {
 			if (started() && event.bad()) {
 				this->stop();
 			}
+		}
+
+		inline void
+		set_user_timeout(const duration& d) {
+			this->_socket.set_user_timeout(d);
 		}
 
 		inline void
@@ -179,10 +189,16 @@ namespace vncd {
 	private:
 		sys::event_poller _poller;
 		std::unordered_map<sys::fd_type,connection_pointer> _connections;
-		mutex_type _mutex;
 		std::priority_queue<task_pointer> _tasks;
+		duration _timeout = duration::zero();
+		mutex_type _mutex;
 
 	public:
+
+		inline void
+		set_user_timeout(const duration& d) {
+			this->_timeout = d;
+		}
 
 		inline void
 		add(Connection* connection, sys::event events=sys::event::in) {
@@ -190,6 +206,7 @@ namespace vncd {
 				throw std::invalid_argument("bad connection");
 			}
 			connection->parent(this);
+			connection->set_user_timeout(this->_timeout);
 			auto fd = connection->fd();
 			lock_type lock(this->_mutex);
 			this->_connections.emplace(fd, connection);
@@ -318,6 +335,7 @@ namespace vncd {
 		sys::pipe _out;
 		size_t _buffer_size = 65536;
 		sys::splice _splice;
+		bool _terminated = false;
 
 	public:
 
@@ -442,8 +460,16 @@ namespace vncd {
 			copy_remote_to_local();
 		}
 
+		inline bool
+		has_been_terminated() const {
+			return _terminated;
+		}
+
 		void
 		terminate() {
+			if (has_been_terminated()) {
+				return;
+			}
 			this->log("terminate");
 			try {
 				this->_processes.terminate();
@@ -469,6 +495,7 @@ namespace vncd {
 			this->_out.close();
 			this->_local_socket.close();
 			this->_remote_socket.close();
+			this->_terminated = true;
 		}
 
 		template <class ... Args>

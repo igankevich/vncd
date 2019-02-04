@@ -354,6 +354,7 @@ namespace vncd {
 		size_t _buffer_size = 65536;
 		sys::splice _splice;
 		bool _terminated = false;
+		bool _verbose = false;
 
 	public:
 
@@ -361,6 +362,11 @@ namespace vncd {
 		Session(const User& user):
 		_user(user) {
 			this->_buffer_size = this->_in.in().pipe_buffer_size();
+		}
+
+		inline void
+		verbose(bool b) {
+			this->_verbose = b;
 		}
 
 		inline void
@@ -459,14 +465,26 @@ namespace vncd {
 		copy_remote_to_local() {
 			ssize_t n1 = 0, n2 = 0;
 			if (this->_remote_socket) {
-				n1 = this->_splice(this->_remote_socket, this->_in, this->_buffer_size);
+				do {
+					n1 = this->_splice(
+						this->_remote_socket,
+						this->_in,
+						this->_buffer_size
+					);
+				} while (n1 > 0);
 			}
 			if (this->_local_socket) {
-				n2 = this->_splice(this->_in, this->_local_socket, this->_buffer_size);
+				do {
+					n2 = this->_splice(
+						this->_in,
+						this->_local_socket,
+						this->_buffer_size
+					);
+				} while (n2 > 0);
 			}
-			#if defined(VNCD_DEBUG)
-			this->log("_ _ _", __func__, n1, n2);
-			#endif
+			if (this->_verbose) {
+				this->log("_ _ _", __func__, n1, n2);
+			}
 		}
 
 		void
@@ -478,9 +496,9 @@ namespace vncd {
 			if (this->_remote_socket) {
 				n2 = this->_splice(this->_out, this->_remote_socket, this->_buffer_size);
 			}
-			#if defined(VNCD_DEBUG)
-			this->log("_ _ _", __func__, n1, n2);
-			#endif
+			if (this->_verbose) {
+				this->log("_ _ _", __func__, n1, n2);
+			}
 		}
 
 		void
@@ -643,6 +661,7 @@ namespace vncd {
 		sys::socket_address _address;
 		sys::port_type _vnc_port;
 		User _user;
+		bool _verbose;
 
 	public:
 
@@ -650,12 +669,14 @@ namespace vncd {
 		Local_server(
 			const sys::socket_address& address,
 			sys::port_type vnc_port,
-			const User& user
+			const User& user,
+			bool verbose
 		):
 		Connection(address.family()),
 		_address(address),
 		_vnc_port(vnc_port),
-		_user(user) {
+		_user(user),
+		_verbose(verbose) {
 			this->_socket.setopt(sys::socket::reuse_addr);
 			this->_socket.bind(this->_address);
 			this->_socket.listen();
@@ -684,6 +705,7 @@ namespace vncd {
 				auto session = std::make_shared<Session>(this->_user);
 				session->set_port(port());
 				session->set_vnc_port(vnc_port());
+				session->verbose(this->_verbose);
 				this->parent().add(new Remote_client(this->_socket, session));
 				this->parent().submit(new Local_client_task(session));
 			}

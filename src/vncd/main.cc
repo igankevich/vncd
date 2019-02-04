@@ -54,6 +54,7 @@ namespace vncd {
 		set_type _old_users;
 		std::chrono::seconds _tcp_user_timeout{60};
 		std::chrono::seconds _update_period{30};
+		bool _verbose = false;
 
 	public:
 
@@ -65,7 +66,7 @@ namespace vncd {
 
 		void
 		parse_arguments(int argc, char* argv[]) {
-			for (int opt; (opt = ::getopt(argc, argv, "hg:p:P:t:T:")) != -1;) {
+			for (int opt; (opt = ::getopt(argc, argv, "hg:p:P:t:T:v")) != -1;) {
 				switch (opt) {
 				case 'h':
 					usage();
@@ -84,6 +85,9 @@ namespace vncd {
 					break;
 				case 'T':
 					::optarg >> this->_update_period;
+					break;
+				case 'v':
+					this->_verbose = true;
 					break;
 				default:
 					usage();
@@ -116,12 +120,13 @@ namespace vncd {
 		void
 		usage() {
 			std::cout <<
-				"usage: vncd [-h] [-p PORT] [-P PORT] [-t TIMEOUT] [-T PERIOD]"
+				"usage: vncd [-h] [-p PORT] [-P PORT] [-t TIMEOUT] [-T PERIOD] -v"
 				" -g GROUP [ADDRESS]\n"
 				"    -p  input port\n"
 				"    -P  output port\n"
 				"    -t  TCP user timeout\n"
-				"    -T  update period\n";
+				"    -T  update period\n"
+				"    -v  be verbose\n";
 		}
 
 		void
@@ -138,7 +143,12 @@ namespace vncd {
 				Port port = this->_port + user.id();
 				Port vnc_port = this->_vnc_base_port + user.id();
 				sys::socket_address address{this->_address, port};
-				this->_server.add(new Local_server(address, vnc_port, user));
+				this->_server.add(new Local_server(
+					address,
+					vnc_port,
+					user,
+					this->_verbose
+				));
 			}
 		}
 

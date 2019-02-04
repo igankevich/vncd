@@ -464,7 +464,9 @@ namespace vncd {
 			if (this->_local_socket) {
 				n2 = this->_splice(this->_in, this->_local_socket, this->_buffer_size);
 			}
+			#if defined(VNCD_DEBUG)
 			this->log("_ _ _", __func__, n1, n2);
+			#endif
 		}
 
 		void
@@ -476,7 +478,9 @@ namespace vncd {
 			if (this->_remote_socket) {
 				n2 = this->_splice(this->_out, this->_remote_socket, this->_buffer_size);
 			}
+			#if defined(VNCD_DEBUG)
 			this->log("_ _ _", __func__, n1, n2);
+			#endif
 		}
 
 		void

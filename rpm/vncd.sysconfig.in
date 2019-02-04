@@ -1,0 +1,1 @@
+VNCD_ARGS="-g vncusers -p 50000 -P 40000 -t 60 -T 30 127.0.0.1"

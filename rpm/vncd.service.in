@@ -1,0 +1,12 @@
+[Unit]
+Description=TurboVNC proxy server
+
+[Service]
+User=vncd
+Group=vncd
+AmbientCapabilities=CAP_SETUID CAP_SETGID
+EnvironmentFile=/@sysconfdir@/sysconfig/vncd
+ExecStart=@prefix@/@bindir@/vncd $VNCD_ARGS
+
+[Install]
+WantedBy=multi-user.target

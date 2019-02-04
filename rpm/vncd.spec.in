@@ -26,20 +26,21 @@ TurboVNC proxy server.
 
 %install
 %meson_install
+%{__mkdir_p} %{buildroot}/%{_sysconfdir}/sysconfig
+%{__mkdir_p} %{buildroot}/%{_unitdir}
+%{__install} -m 0644 rpm/vncd.sysconfig %{buildroot}/%{_sysconfdir}/sysconfig
+%{__install} -m 0644 rpm/vncd.service %{buildroot}/%{_unitdir}
 
 %check
 %meson_test
 
-%post -p /sbin/ldconfig
-
-%postun -p /sbin/ldconfig
-
 %files
-# executables and libraries
 %defattr(0755,root,root,0755)
 %{_bindir}/vncd
-# data files
-# %defattr(0644,root,root,0755)
+%defattr(0644,root,root,0755)
+%config(noreplace) %{_sysconfdir}/sysconfig/vncd
+%{_unitdir}/vncd.service
 
 %changelog
-
+* Mon Feb 4 2019 Ivan Gankevich <igankevich@ya.ru> 0.1.0-1
+Packaged everything.

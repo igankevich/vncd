@@ -68,3 +68,25 @@ if ninja.found()
 	)
 endif
 # }}}
+
+# sysconfig {{{
+sysconfig = configuration_data()
+
+configure_file(
+	input: 'vncd.sysconfig.in',
+	output: 'vncd.sysconfig',
+	configuration: sysconfig
+)
+# }}}
+
+# service {{{
+service = configuration_data()
+service.set('prefix', prefix)
+service.set('bindir', bindir)
+service.set('sysconfdir', sysconfdir)
+configure_file(
+	input: 'vncd.service.in',
+	output: 'vncd.service',
+	configuration: service
+)
+# }}}

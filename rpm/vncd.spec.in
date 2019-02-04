@@ -26,13 +26,38 @@ TurboVNC proxy server.
 
 %install
 %meson_install
+pwd
+ls -l
 %{__mkdir_p} %{buildroot}/%{_sysconfdir}/sysconfig
 %{__mkdir_p} %{buildroot}/%{_unitdir}
-%{__install} -m 0644 rpm/vncd.sysconfig %{buildroot}/%{_sysconfdir}/sysconfig
-%{__install} -m 0644 rpm/vncd.service %{buildroot}/%{_unitdir}
+%{__install} -m 0644 %{_vpath_builddir}/rpm/vncd.sysconfig \
+	%{buildroot}/%{_sysconfdir}/sysconfig/vncd
+%{__install} -m 0644 %{_vpath_builddir}/rpm/vncd.service \
+	%{buildroot}/%{_unitdir}/vncd.service
 
 %check
 %meson_test
+
+%pre
+getent group %{name} >/dev/null || groupadd -r %{name}
+getent passwd %{name} >/dev/null || \
+	useradd \
+		--system \
+		--shell /sbin/nologin \
+		--home-dir / \
+		--no-create-home \
+		--gid %{name} \
+		--comment "VNCD user" \
+		%{name}
+
+%post
+%systemd_post %{name}.service
+
+%preun
+%systemd_preun %{name}.service
+
+%postun
+%systemd_postun_with_restart %{name}.service
 
 %files
 %defattr(0755,root,root,0755)

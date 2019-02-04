@@ -71,11 +71,10 @@ endif
 
 # sysconfig {{{
 sysconfig = configuration_data()
-
 configure_file(
 	input: 'vncd.sysconfig.in',
 	output: 'vncd.sysconfig',
-	configuration: sysconfig
+	copy: true
 )
 # }}}
 

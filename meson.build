@@ -7,6 +7,10 @@ project(
 )
 
 unistdx = dependency('unistdx', version: '>=0.4.15')
+with_rpm = get_option('with_rpm')
 
 subdir('src')
-subdir('rpm')
+
+if with_rpm
+	subdir('rpm')
+endif

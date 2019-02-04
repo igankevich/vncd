@@ -1,0 +1,45 @@
+Name:           @name@
+Version:        @version@
+Release:        1%{?dist}
+Summary:        TurboVNC proxy server
+License:        @license@
+URL:            https://cmmshq.ru/
+Source0:        @name@-%{version}.tar.xz
+
+Requires: unistdx >= 0.4.15
+
+BuildRequires: unistdx-devel >= 0.4.15
+BuildRequires: gcc-c++
+BuildRequires: meson
+
+%description
+TurboVNC proxy server.
+
+%global debug_package %{nil}
+
+%prep
+%autosetup
+
+%build
+%meson
+%meson_build
+
+%install
+%meson_install
+
+%check
+%meson_test
+
+%post -p /sbin/ldconfig
+
+%postun -p /sbin/ldconfig
+
+%files
+# executables and libraries
+%defattr(0755,root,root,0755)
+%{_bindir}/vncd
+# data files
+# %defattr(0644,root,root,0755)
+
+%changelog
+

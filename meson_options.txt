@@ -1,0 +1,6 @@
+option(
+	'with_rpm',
+	type: 'boolean',
+	value: true,
+	description: 'Build RPM package'
+)

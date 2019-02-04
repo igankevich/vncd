@@ -10,7 +10,8 @@ executable(
 	'vncd',
 	sources: vncd_src,
 	dependencies: vncd_deps,
-	include_directories: src
+	include_directories: src,
+	install: true
 )
 
 subdir('test')

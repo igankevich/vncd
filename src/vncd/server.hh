@@ -395,6 +395,7 @@ namespace vncd {
 				sys::this_process::group() == this->_user.group_id()) {
 				return;
 			}
+			sys::this_process::workdir("/");
 			UNISTDX_CHECK(::initgroups(
 				this->_user.name().data(),
 				this->_user.group_id()
@@ -403,6 +404,10 @@ namespace vncd {
 				this->_user.id(),
 				this->_user.group_id()
 			);
+			sys::this_process::workdir(this->_user.home().data());
+			environment("HOME", this->_user.home());
+			environment("SHELL", this->_user.shell());
+			environment("USER", this->_user.name());
 		}
 
 		inline void
@@ -437,9 +442,6 @@ namespace vncd {
 			environment("VNCD_UID", this->_user.id());
 			environment("VNCD_GID", this->_user.group_id());
 			environment("VNCD_PORT", vnc_port());
-			environment("HOME", this->_user.home());
-			environment("SHELL", this->_user.shell());
-			environment("USER", this->_user.name());
 			sys::this_process::execute(args);
 		}
 
@@ -462,9 +464,6 @@ namespace vncd {
 			sys::argstream args;
 			args.append(script);
 			this->log("executing _", args);
-			environment("HOME", this->_user.home());
-			environment("SHELL", this->_user.shell());
-			environment("USER", this->_user.name());
 			environment("DISPLAY", ':' + std::to_string(this->_user.id()));
 			sys::this_process::execute(args);
 		}

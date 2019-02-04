@@ -391,6 +391,14 @@ namespace vncd {
 
 		inline void
 		set_identity() {
+			if (sys::this_process::user() == this->_user.id() &&
+				sys::this_process::group() == this->_user.group_id()) {
+				return;
+			}
+			UNISTDX_CHECK(::initgroups(
+				this->_user.name().data(),
+				this->_user.group_id()
+			));
 			sys::this_process::set_identity(
 				this->_user.id(),
 				this->_user.group_id()

@@ -26,8 +26,6 @@ TurboVNC proxy server.
 
 %install
 %meson_install
-pwd
-ls -l
 %{__mkdir_p} %{buildroot}/%{_sysconfdir}/sysconfig
 %{__mkdir_p} %{buildroot}/%{_unitdir}
 %{__install} -m 0644 %{_vpath_builddir}/rpm/vncd.sysconfig \

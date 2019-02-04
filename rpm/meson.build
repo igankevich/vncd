@@ -1,3 +1,4 @@
+cbd = meson.current_build_dir()
 # RPM archive {{{
 archive_name = meson.project_name() + '-' + meson.project_version()
 full_archive_name = archive_name + '.tar.xz'
@@ -9,7 +10,7 @@ run_target(
 		meson.source_root(),
 		'archive',
 		'-o',
-		join_paths(meson.build_root(), full_archive_name),
+		join_paths(cbd, full_archive_name),
 		'--prefix',
 		archive_name + '/',
 		'HEAD'
@@ -45,9 +46,11 @@ if rpm_build.found()
 		command: [
 			rpm_build,
 			'-ba',
-			join_paths(meson.current_build_dir(), meson.project_name() + '.spec'),
+			join_paths(cbd, meson.project_name() + '.spec'),
 			'--define',
-			'_sourcedir ' + meson.build_root()
+			'_sourcedir ' + cbd,
+			'--define',
+			'_rpmdir ' + join_paths(cbd, 'RPMS')
 		]
 	)
 endif
@@ -88,4 +91,19 @@ configure_file(
 	output: 'vncd.service',
 	configuration: service
 )
+# }}}
+
+# rsync {{{
+rsync = find_program('rsync')
+if rsync.found()
+	run_target(
+		'deploy',
+		command: [
+			rsync,
+			'-acvP',
+			join_paths(cbd, 'RPMS', build_machine.cpu_family()) + '/',
+			url
+		]
+	)
+endif
 # }}}

@@ -4,3 +4,10 @@ option(
 	value: true,
 	description: 'Build RPM package'
 )
+
+option(
+	'url',
+	type: 'string',
+	value: '',
+	description: 'RPM Repository URL'
+)

@@ -4,7 +4,7 @@ Description=TurboVNC proxy server
 [Service]
 User=vncd
 Group=vncd
-AmbientCapabilities=CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_SETUID CAP_SETGID CAP_KILL
 EnvironmentFile=/@sysconfdir@/sysconfig/vncd
 ExecStart=@prefix@/@bindir@/vncd $VNCD_ARGS
 

@@ -29,8 +29,7 @@ exec /opt/TurboVNC/bin/Xvnc \
 	-securitytypes none \
 	-rfbport "$VNCD_PORT" \
 	-fp catalogue:/etc/X11/fontpath.d \
-	-deferupdate 1 \
 	-once \
-	-reset \
-	-terminate \
-	-idletimeout 30
+	-nevershared \
+	-noreverse \
+	-localhost

@@ -23,10 +23,8 @@ xauth add "$h/unix:$VNCD_UID" . $(mcookie)
 xauth merge $key
 exec /opt/TurboVNC/bin/Xvnc \
 	:$VNCD_UID \
-	-geometry 1240x900 \
-	-depth 24 \
-	-rfbwait 60000 \
-	-securitytypes none \
+	-securitytypes unixlogin \
+	-pamsession \
 	-rfbport "$VNCD_PORT" \
 	-fp catalogue:/etc/X11/fontpath.d \
 	-once \

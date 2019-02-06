@@ -633,7 +633,6 @@ namespace vncd {
 		inline explicit
 		Remote_client(sys::socket& server_socket, session_pointer session):
 		_session(std::move(session)) {
-			_session->log("accepting");
 			server_socket.accept(this->_socket, this->_address);
 			this->_session->set_remote_socket(this->_socket);
 			this->_session->vnc_start();
@@ -669,6 +668,7 @@ namespace vncd {
 		sys::port_type _vnc_port;
 		User _user;
 		bool _verbose;
+		session_pointer _session;
 
 	public:
 
@@ -709,12 +709,20 @@ namespace vncd {
 		process(const sys::epoll_event& event) override {
 			Connection::process(event);
 			if (started() && event.in()) {
-				auto session = std::make_shared<Session>(this->_user);
-				session->set_port(port());
-				session->set_vnc_port(vnc_port());
-				session->verbose(this->_verbose);
-				this->parent().add(new Remote_client(this->_socket, session));
-				this->parent().submit(new Local_client_task(session));
+				if (this->_session) {
+					this->_session->log("refusing multiple connections");
+					sys::socket tmp;
+					sys::socket_address tmp2;
+					this->_socket.accept(tmp, tmp2);
+					tmp.close();
+				} else {
+					this->_session = std::make_shared<Session>(this->_user);
+					this->_session->set_port(port());
+					this->_session->set_vnc_port(vnc_port());
+					this->_session->verbose(this->_verbose);
+					this->parent().add(new Remote_client(this->_socket, this->_session));
+					this->parent().submit(new Local_client_task(this->_session));
+				}
 			}
 		}
 

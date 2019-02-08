@@ -709,7 +709,7 @@ namespace vncd {
 		process(const sys::epoll_event& event) override {
 			Connection::process(event);
 			if (started() && event.in()) {
-				if (this->_session) {
+				if (this->_session && !this->_session->has_been_terminated()) {
 					this->_session->log("refusing multiple connections");
 					sys::socket tmp;
 					sys::socket_address tmp2;

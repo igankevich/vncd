@@ -470,6 +470,9 @@ namespace vncd {
 
 		void
 		copy_from_remote_to_pipe() {
+			if (!this->_remote_socket) {
+				return;
+			}
 			ssize_t n = 0;
 			do {
 				n = this->_splice(
@@ -485,6 +488,9 @@ namespace vncd {
 
 		void
 		copy_from_pipe_to_local() {
+			if (!this->_local_socket) {
+				return;
+			}
 			ssize_t n = 0;
 			do {
 				n = this->_splice(
@@ -500,6 +506,9 @@ namespace vncd {
 
 		void
 		copy_from_local_to_pipe() {
+			if (!this->_local_socket) {
+				return;
+			}
 			ssize_t n = 0;
 			do {
 				n = this->_splice(
@@ -515,6 +524,9 @@ namespace vncd {
 
 		void
 		copy_from_pipe_to_remote() {
+			if (!this->_remote_socket) {
+				return;
+			}
 			ssize_t n = 0;
 			do {
 				n = this->_splice(
@@ -530,14 +542,10 @@ namespace vncd {
 
 		void
 		flush() {
-			if (this->_local_socket) {
-				copy_from_local_to_pipe();
-				copy_from_pipe_to_local();
-			}
-			if (this->_remote_socket) {
-				copy_from_remote_to_pipe();
-				copy_from_pipe_to_remote();
-			}
+			copy_from_local_to_pipe();
+			copy_from_pipe_to_local();
+			copy_from_remote_to_pipe();
+			copy_from_pipe_to_remote();
 		}
 
 		inline bool
@@ -620,9 +628,11 @@ namespace vncd {
 			if (started()) {
 				if (event.in()) {
 					this->_session->copy_from_local_to_pipe();
+					this->_session->copy_from_pipe_to_remote();
 				}
 				if (event.out()) {
 					this->_session->copy_from_pipe_to_local();
+					this->_session->copy_from_remote_to_pipe();
 				}
 			}
 		}
@@ -686,9 +696,11 @@ namespace vncd {
 			if (started()) {
 				if (event.in()) {
 					this->_session->copy_from_remote_to_pipe();
+					this->_session->copy_from_pipe_to_local();
 				}
 				if (event.out()) {
 					this->_session->copy_from_pipe_to_remote();
+					this->_session->copy_from_local_to_pipe();
 				}
 			}
 		}

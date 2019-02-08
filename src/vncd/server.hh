@@ -590,8 +590,13 @@ namespace vncd {
 				this->_session->terminate();
 				this->state(State::Stopping);
 			}
-			if (started() && event.in()) {
-				this->_session->copy_local_to_remote();
+			if (started()) {
+				if (event.in()) {
+					this->_session->copy_local_to_remote();
+				}
+				if (event.out()) {
+					this->_session->copy_remote_to_local();
+				}
 			}
 		}
 
@@ -615,7 +620,10 @@ namespace vncd {
 		void run() override {
 			Task::run();
 			this->_session->log("attempts left _", remaining_attempts());
-			this->parent().add(new Local_client(this->_session), sys::event::inout);
+			this->parent().add(
+				new Local_client(this->_session),
+				sys::event::inout
+			);
 		}
 
 	};
@@ -648,8 +656,13 @@ namespace vncd {
 				this->_session->terminate();
 				this->state(State::Stopping);
 			}
-			if (started() && event.in()) {
-				this->_session->copy_remote_to_local();
+			if (started()) {
+				if (event.in()) {
+					this->_session->copy_remote_to_local();
+				}
+				if (event.out()) {
+					this->_session->copy_local_to_remote();
+				}
 			}
 		}
 
@@ -720,7 +733,10 @@ namespace vncd {
 					this->_session->set_port(port());
 					this->_session->set_vnc_port(vnc_port());
 					this->_session->verbose(this->_verbose);
-					this->parent().add(new Remote_client(this->_socket, this->_session));
+					this->parent().add(
+						new Remote_client(this->_socket, this->_session),
+						sys::event::inout
+					);
 					this->parent().submit(new Local_client_task(this->_session));
 				}
 			}

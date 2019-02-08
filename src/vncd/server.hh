@@ -469,48 +469,75 @@ namespace vncd {
 		}
 
 		void
-		copy_remote_to_local() {
-			ssize_t n1 = 0, n2 = 0;
-			if (this->_remote_socket) {
-				do {
-					n1 = this->_splice(
-						this->_remote_socket,
-						this->_in,
-						this->_buffer_size
-					);
-				} while (n1 > 0);
-			}
-			if (this->_local_socket) {
-				do {
-					n2 = this->_splice(
-						this->_in,
-						this->_local_socket,
-						this->_buffer_size
-					);
-				} while (n2 > 0);
-			}
+		copy_from_remote_to_pipe() {
+			ssize_t n = 0;
+			do {
+				n = this->_splice(
+					this->_remote_socket,
+					this->_in,
+					this->_buffer_size
+				);
+			} while (n > 0);
 			if (this->_verbose) {
-				this->log("_ _ _", __func__, n1, n2);
+				this->log("_ _", __func__, n);
 			}
 		}
 
 		void
-		copy_local_to_remote() {
-			ssize_t n1 = 0, n2 = 0;
-			if (this->_local_socket) {
-				n1 = this->_splice(this->_local_socket, this->_out, this->_buffer_size);
-			}
-			if (this->_remote_socket) {
-				n2 = this->_splice(this->_out, this->_remote_socket, this->_buffer_size);
-			}
+		copy_from_pipe_to_local() {
+			ssize_t n = 0;
+			do {
+				n = this->_splice(
+					this->_in,
+					this->_local_socket,
+					this->_buffer_size
+				);
+			} while (n > 0);
 			if (this->_verbose) {
-				this->log("_ _ _", __func__, n1, n2);
+				this->log("_ _", __func__, n);
+			}
+		}
+
+		void
+		copy_from_local_to_pipe() {
+			ssize_t n = 0;
+			do {
+				n = this->_splice(
+					this->_local_socket,
+					this->_out,
+					this->_buffer_size
+				);
+			} while (n > 0);
+			if (this->_verbose) {
+				this->log("_ _", __func__, n);
+			}
+		}
+
+		void
+		copy_from_pipe_to_remote() {
+			ssize_t n = 0;
+			do {
+				n = this->_splice(
+					this->_out,
+					this->_remote_socket,
+					this->_buffer_size
+				);
+			} while (n > 0);
+			if (this->_verbose) {
+				this->log("_ _", __func__, n);
 			}
 		}
 
 		void
 		flush() {
-			copy_remote_to_local();
+			if (this->_local_socket) {
+				copy_from_local_to_pipe();
+				copy_from_pipe_to_local();
+			}
+			if (this->_remote_socket) {
+				copy_from_remote_to_pipe();
+				copy_from_pipe_to_remote();
+			}
 		}
 
 		inline bool
@@ -592,10 +619,10 @@ namespace vncd {
 			}
 			if (started()) {
 				if (event.in()) {
-					this->_session->copy_local_to_remote();
+					this->_session->copy_from_local_to_pipe();
 				}
 				if (event.out()) {
-					this->_session->copy_remote_to_local();
+					this->_session->copy_from_pipe_to_local();
 				}
 			}
 		}
@@ -658,10 +685,10 @@ namespace vncd {
 			}
 			if (started()) {
 				if (event.in()) {
-					this->_session->copy_remote_to_local();
+					this->_session->copy_from_remote_to_pipe();
 				}
 				if (event.out()) {
-					this->_session->copy_local_to_remote();
+					this->_session->copy_from_pipe_to_remote();
 				}
 			}
 		}

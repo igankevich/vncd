@@ -92,18 +92,3 @@ configure_file(
 	configuration: service
 )
 # }}}
-
-# rsync {{{
-rsync = find_program('rsync')
-if rsync.found()
-	run_target(
-		'deploy',
-		command: [
-			rsync,
-			'-acvP',
-			join_paths(cbd, 'RPMS', build_machine.cpu_family()) + '/',
-			url
-		]
-	)
-endif
-# }}}

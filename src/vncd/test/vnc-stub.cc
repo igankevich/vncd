@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: gpl3+
+
 #include <cstdlib>
 
 #include <unistdx/base/byte_buffer>

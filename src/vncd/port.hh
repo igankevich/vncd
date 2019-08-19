@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: gpl3+
+
 #ifndef VNCD_PORT_HH
 #define VNCD_PORT_HH
 

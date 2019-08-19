@@ -4,7 +4,7 @@ lroject(
 	version: '0.1.9',
 	meson_version: '>=0.47',
 	default_options: ['cpp_std=c++11'],
-	license: 'GPLv3+'
+	license: 'gpl3+'
 )
 
 unistdx = dependency('unistdx', version: '>=0.4.15')

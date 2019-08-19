@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: gpl3+
+
 #ifndef VNCD_SERVER_HH
 #define VNCD_SERVER_HH
 

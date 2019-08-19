@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: gpl3+
+
 #include <unistd.h>
 
 #include <iostream>

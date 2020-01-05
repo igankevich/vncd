@@ -90,15 +90,10 @@ namespace vncd {
 
 		virtual void
 		process(const sys::epoll_event& event) {
-			if (initial()) {
-				throw std::logic_error("bad state");
-			}
-			if (starting() && !event.bad()) {
-				this->_state = State::Started;
-			}
-			if (started() && event.bad()) {
-				this->stop();
-			}
+			if (initial()) { throw std::logic_error("bad state"); }
+			if (starting() && !event.bad()) { this->_state = State::Started; }
+			if (started() && event.bad()) { this->state(State::Stopping); }
+			if (stopping()) { this->state(State::Stopped); }
 		}
 
 		inline void
@@ -218,7 +213,7 @@ namespace vncd {
 			connection->set_user_timeout(this->_timeout);
 			auto fd = connection->fd();
 			lock_type lock(this->_mutex);
-			this->_connections.emplace(fd, connection);
+			this->_connections.emplace(fd, connection_pointer(connection));
 			this->_poller.emplace(fd, events);
 			connection->start();
 		}

@@ -1,7 +1,7 @@
 project(
 	'vncd',
 	'cpp',
-	version: '0.1.11',
+	version: '0.1.12',
 	meson_version: '>=0.47',
 	default_options: ['cpp_std=c++11'],
 	license: 'gpl3+'

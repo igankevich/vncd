@@ -673,9 +673,12 @@ namespace vncd {
 	public:
 
 		inline explicit
-		Remote_client(sys::socket& server_socket, session_pointer session):
+		Remote_client(sys::socket& server_socket,
+                      session_pointer session,
+                      sys::socket&& socket,
+                      const sys::socket_address& address):
+        _address(address),
 		_session(std::move(session)) {
-			server_socket.accept(this->_socket, this->_address);
 			this->_session->set_remote_socket(this->_socket);
 			this->_session->vnc_start();
 		}
@@ -733,7 +736,7 @@ namespace vncd {
 		_vnc_port(vnc_port),
 		_user(user),
 		_verbose(verbose) {
-			this->_socket.setopt(sys::socket::reuse_addr);
+			this->_socket.set(sys::socket::options::reuse_address);
 			this->_socket.bind(this->_address);
 			this->_socket.listen();
 			sys::log_message(this->_user.name().data(), "listen");
@@ -762,18 +765,20 @@ namespace vncd {
 					this->_session->log("refusing multiple connections");
 					sys::socket tmp;
 					sys::socket_address tmp2;
-					this->_socket.accept(tmp, tmp2);
-					tmp.close();
+                    while (this->_socket.accept(tmp, tmp2)) { tmp.close(); }
 				} else {
 					this->_session = std::make_shared<Session>(this->_user);
 					this->_session->set_port(port());
 					this->_session->set_vnc_port(vnc_port());
 					this->_session->verbose(this->_verbose);
-					this->parent().add(
-						new Remote_client(this->_socket, this->_session),
-						sys::event::inout
-					);
-					this->parent().submit(new Local_client_task(this->_session));
+                    sys::socket socket;
+                    sys::socket_address address;
+                    while (this->_socket.accept(socket, address)) {
+                        this->parent().add(
+                            new Remote_client(this->_socket, this->_session, std::move(socket), address),
+                            sys::event::inout);
+                        this->parent().submit(new Local_client_task(this->_session));
+                    }
 				}
 			}
 		}

@@ -11,8 +11,7 @@
 
 #include <unistdx/ipc/signal>
 #include <unistdx/net/socket_address>
-#include <unistdx/util/group>
-#include <unistdx/util/user>
+#include <unistdx/system/nss>
 
 #include <vncd/port.hh>
 #include <vncd/server.hh>

@@ -1,13 +1,13 @@
 project(
 	'vncd',
 	'cpp',
-	version: '0.1.12',
+	version: '0.1.13',
 	meson_version: '>=0.47',
 	default_options: ['cpp_std=c++11'],
 	license: 'gpl3+'
 )
 
-unistdx = dependency('unistdx', version: '>=0.4.15')
+unistdx = dependency('unistdx', version: '>=0.44.4')
 with_rpm = get_option('with_rpm')
 prefix = get_option('prefix')
 bindir = get_option('bindir')

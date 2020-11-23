@@ -36,7 +36,7 @@ namespace vncd {
 			}
 			Port port;
 			str >> port;
-			sys::socket_address address{{127,0,0,1},port};
+			sys::socket_address address{sys::ipv4_socket_address{{127,0,0,1},port}};
 			sys::log_message("stub", "listen _", address);
 			this->_server.bind(address);
 			this->_server.listen();

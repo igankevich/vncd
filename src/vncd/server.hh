@@ -174,7 +174,7 @@ namespace vncd {
 
 		inline sys::port_type
 		port() const {
-			return this->_socket.bind_addr().port();
+			return sys::socket_address_cast<sys::ipv4_socket_address>(this->_socket.bind_addr()).port();
 		}
 
 	};
@@ -604,9 +604,9 @@ namespace vncd {
 		inline explicit
 		Local_client(std::shared_ptr<Session> session):
 		_session(session) {
-			sys::socket_address address{{127,0,0,1},this->_session->vnc_port()};
+			sys::ipv4_socket_address address{{127,0,0,1},this->_session->vnc_port()};
 			session->log("connecting to _", address);
-			this->_socket.bind({{127,0,0,1},0});
+			this->_socket.bind(sys::ipv4_socket_address{{127,0,0,1},0});
 			this->_socket.connect(address);
 		}
 
@@ -749,7 +749,7 @@ namespace vncd {
 
 		inline sys::port_type
 		port() const noexcept {
-			return this->_address.port();
+			return sys::socket_address_cast<sys::ipv4_socket_address>(this->_address).port();
 		}
 
 		inline sys::port_type

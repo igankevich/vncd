@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-#include <unistdx/util/user>
+#include <unistdx/system/nss>
 
 namespace vncd {
 

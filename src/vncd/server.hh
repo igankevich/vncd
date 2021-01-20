@@ -603,6 +603,7 @@ namespace vncd {
 
 		inline explicit
 		Local_client(std::shared_ptr<Session> session):
+        Connection{sys::family_type::ipv4},
 		_session(session) {
 			sys::ipv4_socket_address address{{127,0,0,1},this->_session->vnc_port()};
 			session->log("connecting to _", address);
@@ -679,6 +680,7 @@ namespace vncd {
                       const sys::socket_address& address):
         _address(address),
 		_session(std::move(session)) {
+            this->_socket = std::move(socket);
 			this->_session->set_remote_socket(this->_socket);
 			this->_session->vnc_start();
 		}

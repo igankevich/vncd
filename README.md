@@ -4,11 +4,11 @@ VNCD is a daemon that automatically spawns X servers and sessions for VNC
 clients.
 1. Each user is assigned a unique port.
 2. When VNC client connects to this port a server script, specified by
-   `VNCD_SERVER` environment variable, is executed
+   `VNCD_SERVER` environment variable, is executed.
    User id, group id and local port are passed via environment variables
    `VNCD_UID`, `VNCD_GID` and `VNCD_PORT` respectively.
 3. After the port becomes active a session script, specified by
-   `VNCD_SESSION` environment variable is executed.
+   `VNCD_SESSION` environment variable, is executed.
 
 VNCD can be used with any VNC server, but we tested only TurboVNC.  The
 advantage of using VNCD over plain VNC is that you no longer need to
@@ -74,4 +74,18 @@ meson . build
 cd build
 ninja
 ninja install
+```
+
+# Usage
+
+In order to run VNCD you need to specify at least access group and bind address.
+```bash
+# bind ports for all users from vnc-users group
+# listen on 0.0.0.0 address
+vncd -g vnc-users 0.0.0.0
+```
+
+To see all options use help command.
+```bash
+vncd -h
 ```

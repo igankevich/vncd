@@ -132,7 +132,8 @@ namespace vncd {
                 "    -P  output port\n"
                 "    -t  TCP user timeout\n"
                 "    -T  update period\n"
-                "    -v  be verbose\n";
+                "    -v  be verbose\n"
+                "    -g  access group\n";
         }
 
         void

@@ -1,7 +1,7 @@
 # Overview
 
 VNCD is a daemon that automatically spawns X servers and sessions for VNC
-clients:
+clients.
 1. Each user is assigned a unique port.
 2. When VNC client connects to this port a server script, specified by
    `VNCD_SERVER` environment variable, is executed
@@ -10,11 +10,11 @@ clients:
 3. After the port becomes active a session script, specified by
    `VNCD_SESSION` environment variable is executed.
 
-VNCD can be used with any VNC server, but we developed and tested TurboVNC
-only.  The advantage of using VNCD over plain VNC is that you no longer need to
-log in to the server via SSH to spawn personal VNC server, you run VNCD,
-connect to your unique port instead, type login and password (using UnixLogin
-authorisation method of TurboVNC) and continue with your work.
+VNCD can be used with any VNC server, but we tested only TurboVNC.  The
+advantage of using VNCD over plain VNC is that you no longer need to
+log in to the server via SSH to spawn personal VNC server: instead you run VNCD,
+connect to your unique port, type login and password (using UnixLogin
+authorisation method of TurboVNC) and go on with your work.
 
 
 # TurboVNC server and session scripts

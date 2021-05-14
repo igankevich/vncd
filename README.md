@@ -31,7 +31,7 @@ exec > "$log_directory/turbovnc.server.log" 2>&1
 
 # generate keys
 h=$(hostname)
-key=$HOME/.config/VirtualGL/xauth-server-key
+key=/etc/opt/VirtualGL/vgl_xauth_key
 xauth add "$h/unix:$VNCD_UID" . $(mcookie)
 xauth merge $key
 

@@ -11,6 +11,7 @@ executable(
 	sources: vncd_src,
 	dependencies: vncd_deps,
 	include_directories: src,
+    implicit_include_directories: false,
 	install: true
 )
 

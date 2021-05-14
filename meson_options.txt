@@ -1,4 +1,11 @@
 option(
+	'with_debug',
+	type: 'boolean',
+	value: false,
+	description: 'Build with additional debug output'
+)
+
+option(
 	'with_rpm',
 	type: 'boolean',
 	value: false,

@@ -38,7 +38,7 @@ xauth merge $key
 # X server
 exec /opt/TurboVNC/bin/Xvnc \
 	:$VNCD_UID \
-	-securitytypes none \
+	-securitytypes UnixLogin \
 	-pamsession \
 	-rfbport "$VNCD_PORT" \
 	-fp catalogue:/etc/X11/fontpath.d \

@@ -79,6 +79,8 @@ ninja install
 # Usage
 
 In order to run VNCD you need to specify at least access group and bind address.
+Each user from the access group is given a unique port calculated as `base-port + user-id`.
+Default base port is 50000.
 ```bash
 # bind ports for all users from vnc-users group
 # listen on 0.0.0.0 address
